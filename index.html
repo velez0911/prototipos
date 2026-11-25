@@ -77,6 +77,11 @@ button, input, select { font: inherit; color: inherit; }
   background: var(--graphite);
 }
 .sidebar nav { display: flex; flex-direction: column; }
+.camera-control { display: grid; gap: 9px; padding: 14px 16px; border-bottom: 2px solid #14171a; }
+.camera-state, .production-state { color: var(--beige); font: 400 12px var(--font-mono); line-height: 1.5; }
+.camera-state.off, .production-state.stopped { color: #e29b87; }
+.camera-state.running, .production-state.running { color: #9dc8a8; }
+.camera-control .btn { width: 100%; }
 .tab {
   appearance: none; background: transparent; border: 0; border-bottom: 2px solid #14171a;
   text-align: left; padding: 20px 26px; font-size: 20px; font-weight: 500; color: var(--beige);
@@ -212,6 +217,11 @@ tbody tr.clickable td:first-child { color: var(--accent); font-weight: 500; text
 .foto-view img { max-width: 100%; max-height: 62vh; display: block; }
 .foto-actions { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 20px; background: var(--beige); border-top: 1px solid var(--line); }
 .foto-actions .btn { display: inline-flex; align-items: center; cursor: pointer; }
+.train-labels { display: flex; align-items: center; gap: 6px; }
+.train-labels .btn { height: 30px; padding: 0 10px; }
+.train-labels .btn:disabled { cursor: not-allowed; opacity: .5; }
+.train-status { min-width: 100px; color: var(--steel); font-size: 12px; }
+.btn.danger { border-color: var(--bad); color: var(--bad); }
 @media (max-width: 1100px) {
   .charts, .summary { grid-template-columns: minmax(0, 1fr); }
 }
@@ -245,7 +255,8 @@ tbody tr.clickable td:first-child { color: var(--accent); font-weight: 500; text
     <path d="M60 6 C57 6 55 10 55 14 L50 12 L47 16 C40 12 28 10 6 12 C14 16 20 24 22 34 C26 28 32 26 38 28 C42 32 46 36 50 36 C51 44 55 54 60 66 C65 54 69 44 70 36 C74 36 78 32 82 28 C88 26 94 28 98 34 C100 24 106 16 114 12 C92 10 80 12 73 16 L70 12 L65 14 C65 10 63 6 60 6 Z"/>
     <circle cx="56.5" cy="19" r="1.6" fill="#ece7dc"/><circle cx="63.5" cy="19" r="1.6" fill="#ece7dc"/>
   </svg>
-  <div class="sys mono"><span class="live-dot"></span>LÍNEA 3 · EN OPERACIÓN<br><span id="clock"></span></div>
+  <p>SUPERVICION DE LINEAS DE PRODUCCION CON IA</p>
+  <div class="sys mono"><span class="live-dot" id="header-live-dot"></span>LÍNEA 3 · <span id="header-live-status">CONECTANDO</span><br><span id="clock"></span></div>
 </header>
 
 <aside class="sidebar">
@@ -255,7 +266,12 @@ tbody tr.clickable td:first-child { color: var(--accent); font-weight: 500; text
     <button class="tab" role="tab" id="tab-graficas" aria-controls="panel-graficas" aria-selected="false" data-tab="graficas">gráficas</button>
     <button class="tab" role="tab" id="tab-piezas" aria-controls="panel-piezas" aria-selected="false" data-tab="piezas">piezas</button>
   </nav>
-  <div class="side-foot">Datos de ejemplo<br>Turnos: 06:00–14:00 / 14:00–22:00</div>
+  <div class="camera-control" aria-live="polite">
+    <div class="camera-state" id="camera-state"><span class="live-dot" id="camera-dot"></span><span id="camera-status">Conectando cámara...</span></div>
+    <button class="btn dark" id="camera-toggle" type="button" disabled>Conectando...</button>
+    <div class="production-state" id="production-status">Producción: esperando</div>
+  </div>
+  <div class="side-foot">Turnos: 06:00–14:00 / 14:00–22:00</div>
 </aside>
 
 <main class="main">
@@ -263,11 +279,11 @@ tbody tr.clickable td:first-child { color: var(--accent); font-weight: 500; text
   <!-- REGISTRO -->
   <section class="panel" id="panel-registro" role="tabpanel" aria-labelledby="tab-registro">
     <h2>registro de producción</h2>
-    <p class="sub">Consulta los lotes por un día específico o por un rango de fechas. Haz clic en un lote para ver la información y la foto de cada pieza.</p>
+    <p class="sub">Cada pieza se registra una vez cuando se detecta su color en la imagen. Las capturas de referencia cada 10 segundos no aumentan el conteo. Haz clic en un lote para ver la información y las fotos.</p>
     <div class="toolbar">
       <div class="field"><label for="f-desde">Desde</label><input type="date" id="f-desde"></div>
       <div class="field"><label for="f-hasta">Hasta</label><input type="date" id="f-hasta"></div>
-      <div class="field grow"><label for="f-texto">Buscar lote u operador</label><input type="search" id="f-texto" placeholder="Ej. L-261030-03 o Marisol"></div>
+      <div class="field grow"><label for="f-texto">Buscar lote u operador</label><input type="search" id="f-texto" placeholder="Buscar lote u operador"></div>
       <div class="field"><label for="f-estado">Estado</label>
         <select id="f-estado"><option value="">Todos</option><option>Completado</option><option>En curso</option><option>Con incidencia</option></select>
       </div>
@@ -343,7 +359,7 @@ tbody tr.clickable td:first-child { color: var(--accent); font-weight: 500; text
             <div class="sum-col">
               <p class="sec-title">Porcentaje de aprobación</p>
               <div class="meter" id="good-meter"><i></i><u></u></div>
-              <div class="meter-legend"><span id="good-pct">0%</span><span>meta 96%</span></div>
+              <div class="meter-legend"><span id="good-pct">0%</span><span>meta pendiente</span></div>
             </div>
           </div>
           <div>
@@ -394,11 +410,11 @@ tbody tr.clickable td:first-child { color: var(--accent); font-weight: 500; text
           <button type="button" data-res="Defectuosa" aria-pressed="false">Defectuosas</button>
         </div>
       </div>
-      <div class="field grow"><label for="m-buscar">Buscar pieza o motivo</label><input type="search" id="m-buscar" placeholder="Ej. 045 o Rayaduras"></div>
+      <div class="field grow"><label for="m-buscar">Buscar pieza o motivo</label><input type="search" id="m-buscar" placeholder="Buscar pieza o motivo"></div>
     </div>
     <div class="modal-body">
       <table>
-        <thead><tr><th>ID de pieza</th><th>Hora</th><th>Estación</th><th>Resultado</th><th>Motivo de rechazo</th><th>Foto</th></tr></thead>
+        <thead><tr><th>ID de pieza</th><th>Hora</th><th>Estación</th><th>Resultado</th><th>Motivo</th><th>Foto</th><th>Clasificación y entrenamiento</th><th>Acciones</th></tr></thead>
         <tbody id="m-body"></tbody>
       </table>
       <div class="empty" id="m-empty" hidden>Ninguna pieza coincide con el filtro.</div>
@@ -422,63 +438,79 @@ tbody tr.clickable td:first-child { color: var(--accent); font-weight: 500; text
 </div>
 
 <script>
-/* ============ DATOS DE EJEMPLO ============ */
-const REASONS = ["Defecto de ensamble", "Rayaduras", "Dimensión fuera de tolerancia", "Soldadura deficiente", "Contaminación"];
-const REASON_COLORS = ["#b3513a", "#5b7689", "#b0852c", "#7f8a93", "#3a4147"];
-const OPERATORS_AM = ["Marisol Ortega", "Jorge Valdez", "Iván Cervantes", "Lucía Barraza"];
-const OPERATORS_PM = ["Ricardo Mendoza", "Elena Palacios", "Hugo Saucedo", "Daniela Ruiz"];
-const DAYS = ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30"];
-const TODAY = "2026-10-30";
-const HOURLY_GOAL = 190;
+const REASONS = ["Grieta visible", "Fragmentos separados", "Color defectuoso", "Otros"];
+const REASON_COLORS = ["#b3513a", "#d66a45", "#d39b27", "#7a8490"];
+const TODAY = new Date().toISOString().slice(0, 10);
+const HOURLY_GOAL = null;
 
-function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const pad = n => String(n).padStart(2, "0");
 
-function buildData() {
-  const lots = [];
-  DAYS.forEach((day, d) => {
-    const rnd = mulberry32(1000 + d * 77);
-    const yymmdd = day.slice(2).replace(/-/g, "");
-    for (let i = 0; i < 8; i++) {
-      const startH = 6 + i * 2;
-      const turno = i < 4 ? "Matutino" : "Vespertino";
-      const op = (i < 4 ? OPERATORS_AM : OPERATORS_PM)[(i + d) % 4];
-      let h1 = Math.round(165 + rnd() * 45), h2 = Math.round(165 + rnd() * 45);
-      let estado = "Completado", fin = pad(startH + 2) + ":00";
-      if (day === TODAY && i === 7) { h1 = Math.round(h1 * 0.45); h2 = 0; estado = "En curso"; fin = "--:--"; }
-      else if ((d + i) % 11 === 5) { h2 = Math.round(h2 * 0.55); estado = "Con incidencia"; fin = pad(startH + 2) + ":" + pad(10 + Math.floor(rnd() * 40)); }
-      const qty = h1 + h2;
-      const rate = 0.02 + rnd() * 0.04;
-      const bad = Math.round(qty * rate);
-      const byReason = new Array(REASONS.length).fill(0);
-      const reasonList = [];
-      for (let k = 0; k < bad; k++) {
-        const r = rnd(), ri = r < 0.30 ? 0 : r < 0.55 ? 1 : r < 0.78 ? 2 : r < 0.92 ? 3 : 4;
-        byReason[ri]++; reasonList.push(ri);
-      }
-      const id = `L-${yymmdd}-${pad(i + 1)}`;
-      // Piezas individuales del lote
-      const badIdx = new Set();
-      while (badIdx.size < bad) badIdx.add(Math.floor(rnd() * qty));
-      const piezas = [];
-      let rIdx = 0;
-      for (let n = 0; n < qty; n++) {
-        const mins = n < h1 ? Math.floor(n / h1 * 60) : 60 + Math.floor((n - h1) / Math.max(h2, 1) * 60);
-        const isBad = badIdx.has(n);
-        const reason = isBad ? reasonList[rIdx++] : -1;
-        piezas.push({
-          pieza: `P-${yymmdd}${pad(i + 1)}-${String(n + 1).padStart(3, "0")}`,
-          lote: id, fecha: day, hora: pad(startH + Math.floor(mins / 60)) + ":" + pad(mins % 60),
-          estacion: "E" + (1 + Math.floor(rnd() * 6)), operador: op,
-          resultado: isBad ? "Defectuosa" : "Buena", motivo: isBad ? REASONS[reason] : "—"
-        });
-      }
-      lots.push({ id, fecha: day, inicio: pad(startH) + ":00", fin, turno, operador: op, cantidad: qty, defectuosas: bad, buenas: qty - bad, estado, horas: [h1, h2], startH, byReason, piezas });
-    }
-  });
-  return { lots };
+let DATA = { lots: [] };
+let cameraEnabled = false;
+
+function updateCameraControls(live) {
+  if (typeof live.camera_enabled !== "boolean") return;
+  cameraEnabled = live.camera_enabled;
+  const cameraState = $("#camera-state");
+  const cameraError = live.camera_error || live.error || "";
+  cameraState.classList.toggle("off", !cameraEnabled || Boolean(cameraError));
+  cameraState.classList.toggle("running", cameraEnabled && !cameraError);
+  const dotColor = cameraError || live.production_status === "parada"
+    ? "var(--bad)"
+    : cameraEnabled ? "var(--good)" : "var(--steel)";
+  $("#camera-dot").style.background = dotColor;
+  $("#header-live-dot").style.background = dotColor;
+  $("#camera-status").textContent = cameraError ? "Error de cámara" : cameraEnabled ? "Cámara encendida" : "Cámara apagada";
+  cameraState.title = cameraError;
+  $("#header-live-status").textContent = cameraError
+    ? "ERROR DE CÁMARA"
+    : live.production_status === "parada"
+      ? "PRODUCCIÓN PARADA"
+      : cameraEnabled ? "EN PRODUCCIÓN" : "CÁMARA APAGADA";
+
+  const productionStatus = $("#production-status");
+  const statusText = {
+    camara_apagada: "Producción: cámara apagada",
+    parada: "Producción parada",
+    produciendo: "Producción activa"
+  };
+  productionStatus.textContent = statusText[live.production_status] || "Producción: esperando";
+  productionStatus.classList.toggle("stopped", live.production_status === "parada" || !cameraEnabled);
+  productionStatus.classList.toggle("running", live.production_status === "produciendo" && cameraEnabled);
+
+  const button = $("#camera-toggle");
+  button.textContent = cameraEnabled ? "Apagar cámara" : cameraError ? "Reintentar cámara" : "Encender cámara";
+  button.disabled = false;
+  button.setAttribute("aria-pressed", String(cameraEnabled));
 }
-const DATA = buildData();
+
+async function syncWithServer() {
+  try {
+    const response = await fetch("/api/state", { cache: "no-store" });
+    if (!response.ok) return;
+    const live = await response.json();
+    updateCameraControls(live);
+    if (Array.isArray(live.lots)) {
+      DATA.lots = live.lots;
+      if (modalLot) {
+        const updatedLot = live.lots.find(lot => lot.id === modalLot.id);
+        if (updatedLot) modalLot = updatedLot;
+        else { modalLot = null; $("#modal").hidden = true; }
+      }
+      live.lots.forEach(lot => lot.piezas.forEach(piece => {
+        if (piece.foto) FOTOS[piece.pieza] = piece.foto;
+      }));
+      const today = new Date().toISOString().slice(0, 10);
+      if (!currentDay || currentDay === TODAY) setDay(today);
+      renderRegistro();
+      if (!document.querySelector("#panel-graficas").hidden) renderCharts();
+      if (!document.querySelector("#panel-piezas").hidden) renderPiezas();
+      if (modalLot && !$("#modal").hidden) renderModal();
+    }
+  } catch (error) {
+    // El panel conserva sus datos locales si el servidor temporalmente no responde.
+  }
+}
 
 /* ============ UTILIDADES ============ */
 const $ = s => document.querySelector(s);
@@ -486,6 +518,26 @@ const fmt = n => n.toLocaleString("es-MX");
 const fechaLarga = iso => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); };
 const lotsOf = day => DATA.lots.filter(l => l.fecha === day);
 const badgeClass = e => e === "Completado" ? "ok" : e === "En curso" ? "run" : "warn";
+
+$("#camera-toggle").addEventListener("click", async () => {
+  const button = $("#camera-toggle");
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/camera", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: !cameraEnabled })
+    });
+    const result = await response.json();
+    updateCameraControls(result);
+    if (!response.ok) throw new Error(result.error || "No se pudo cambiar el estado de la cámara.");
+    await syncWithServer();
+  } catch (error) {
+    alert("No se pudo cambiar el estado de la cámara: " + error.message);
+  } finally {
+    button.disabled = false;
+  }
+});
 
 /* ============ PESTAÑAS ============ */
 const tabs = document.querySelectorAll(".tab");
@@ -611,8 +663,18 @@ function renderModal() {
   const rows = l.piezas.filter(p => (!modalRes || p.resultado === modalRes) && (!q || p.pieza.toLowerCase().includes(q) || p.motivo.toLowerCase().includes(q)));
   $("#m-chips").innerHTML = [["Piezas del lote", l.cantidad], ["Buenas", l.buenas], ["Defectuosas", l.defectuosas], ["Mostrando", rows.length]]
     .map(([k, v]) => `<div class="chip"><span>${k}</span><b>${fmt(v)}</b></div>`).join("");
-  $("#m-body").innerHTML = rows.map(p => `<tr><td class="mono">${p.pieza}</td><td class="mono">${p.hora}</td><td class="mono">${p.estacion}</td>
-    <td><span class="badge ${p.resultado === "Buena" ? "ok" : "bad"}">${p.resultado}</span></td><td>${p.motivo}</td><td>${fotoCell(p.pieza)}</td></tr>`).join("");
+  $("#m-body").innerHTML = rows.map(p => {
+    const resultClass = p.resultado === "Buena" ? "ok" :
+      p.resultado === "Defectuosa" ? "bad" : "warn";
+    const trainingLabel = p.etiqueta_manual === "BUENA" ? "Marcada buena" :
+      p.etiqueta_manual === "DANADA" ? "Marcada mala" : "Sin marcar";
+    return `<tr><td class="mono">${p.pieza}</td><td class="mono">${p.hora}</td><td class="mono">${p.estacion}</td>
+      <td><span class="badge ${resultClass}">${p.resultado}</span></td><td>${p.motivo}</td><td>${fotoCell(p.pieza)}</td>
+      <td><div class="train-labels"><span class="train-status">${trainingLabel}</span>
+      <button class="btn" type="button" data-label-piece="${p.pieza}" data-label="BUENA" ${p.foto ? "" : "disabled"}>Buena</button>
+      <button class="btn" type="button" data-label-piece="${p.pieza}" data-label="DANADA" ${p.foto ? "" : "disabled"}>Mala</button></div></td>
+      <td><button class="btn danger" type="button" data-delete-piece="${p.pieza}">Borrar</button></td></tr>`;
+  }).join("");
   $("#m-empty").hidden = rows.length > 0;
 }
 $("#reg-body").addEventListener("click", e => { const tr = e.target.closest("tr[data-id]"); if (tr) openLot(tr.dataset.id); });
@@ -621,6 +683,47 @@ $("#m-close").addEventListener("click", closeLot);
 $("#modal").addEventListener("click", e => { if (e.target.id === "modal") closeLot(); });
 document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (!$("#foto-modal").hidden) $("#foto-modal").hidden = true; else if (!$("#modal").hidden) closeLot(); });
 $("#m-buscar").addEventListener("input", renderModal);
+document.addEventListener("click", async e => {
+  const button = e.target.closest("button[data-label-piece]");
+  if (!button) return;
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/label", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ piece: button.dataset.labelPiece, label: button.dataset.label })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "No se pudo guardar la etiqueta.");
+    await syncWithServer();
+  } catch (error) {
+    alert("No se pudo etiquetar la foto: " + error.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+document.addEventListener("click", async e => {
+  const button = e.target.closest("button[data-delete-piece]");
+  if (!button) return;
+  const pieceId = button.dataset.deletePiece;
+  if (!confirm(`¿Borrar definitivamente ${pieceId}, su registro y su foto de producción? La copia de entrenamiento se conservará.`)) return;
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/delete-piece", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ piece: pieceId })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "No se pudo borrar el registro.");
+    await syncWithServer();
+    if (result.aviso) alert(result.aviso);
+  } catch (error) {
+    alert("No se pudo borrar la pieza: " + error.message);
+  } finally {
+    button.disabled = false;
+  }
+});
 document.querySelectorAll("#modal .seg button").forEach(b => b.addEventListener("click", () => {
   modalRes = b.dataset.res;
   document.querySelectorAll("#modal .seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
@@ -629,9 +732,9 @@ document.querySelectorAll("#modal .seg button").forEach(b => b.addEventListener(
 
 /* ============ DÍA COMPARTIDO ============ */
 let currentDay = TODAY;
-["#g-dia", "#p-dia"].forEach(s => { const el = $(s); el.value = TODAY; el.min = DAYS[0]; el.max = DAYS[DAYS.length - 1]; });
+["#g-dia", "#p-dia"].forEach(s => { const el = $(s); el.value = TODAY; });
 function setDay(v) {
-  if (!v || !DAYS.includes(v)) return;
+  if (!v) return;
   currentDay = v; $("#g-dia").value = v; $("#p-dia").value = v;
   if (!$("#panel-graficas").hidden) renderCharts();
   if (!$("#panel-piezas").hidden) renderPiezas();
@@ -665,7 +768,7 @@ const centerText = { id: "centerText", afterDraw(c) {
 
 function renderCharts() {
   const s = dayStats(currentDay);
-  $("#g1-sub").textContent = `${fechaLarga(currentDay)} · total ${fmt(s.total)} piezas · meta ${HOURLY_GOAL}/h`;
+  $("#g1-sub").textContent = `${fechaLarga(currentDay)} · total ${fmt(s.total)} piezas · ${HOURLY_GOAL === null ? "meta pendiente" : "meta " + HOURLY_GOAL + "/h"}`;
   $("#g2-sub").textContent = `${fmt(s.bad)} piezas defectuosas (${s.total ? (s.bad / s.total * 100).toFixed(1) : 0}% de merma)`;
   $("#xlsx-info").textContent = `El Excel incluye las ${fmt(s.total)} piezas del día, una por fila.`;
   const labels = s.hours.map(h => pad(h.h) + ":00");
@@ -676,7 +779,7 @@ function renderCharts() {
     type: prodType,
     data: { labels, datasets: [
       { label: "Piezas por hora", data: values, backgroundColor: "#5b7689", borderColor: "#262a2e", borderWidth: prodType === "line" ? 2.5 : 0, tension: .25, fill: false, pointRadius: prodType === "line" ? 4 : 0, pointBackgroundColor: "#262a2e", borderRadius: 2, order: 2 },
-      { label: "Meta por hora", type: "line", data: labels.map(() => HOURLY_GOAL), borderColor: "#b0852c", borderDash: [6, 5], borderWidth: 2, pointRadius: 0, order: 1 }
+      ...(HOURLY_GOAL === null ? [] : [{ label: "Meta por hora", type: "line", data: labels.map(() => HOURLY_GOAL), borderColor: "#b0852c", borderDash: [6, 5], borderWidth: 2, pointRadius: 0, order: 1 }])
     ] },
     options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
       plugins: { legend: { position: "bottom" }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y} pzas` } } },
@@ -779,15 +882,16 @@ function renderPiezas(keepLot) {
   const s = { lots, total: lots.reduce((a, l) => a + l.cantidad, 0), bad: lots.reduce((a, l) => a + l.defectuosas, 0), byReason: REASONS.map((_, i) => lots.reduce((a, l) => a + l.byReason[i], 0)) };
   s.good = s.total - s.bad;
   const pct = s.total ? s.good / s.total * 100 : 0;
-  const GOAL = 96;
+  const GOAL = null;
   $("#good-total").innerHTML = `${fmt(s.good)}<small>piezas conformes</small>`;
   $("#pick-good-n").textContent = fmt(s.good); $("#pick-bad-n").textContent = fmt(s.bad);
   const best = s.lots.filter(l => l.cantidad).sort((a, b) => b.buenas / b.cantidad - a.buenas / a.cantidad)[0];
   $("#good-metrics").innerHTML = [
-    ["Aprobación", pct.toFixed(1) + "%"], ["Lotes aprobados", s.lots.filter(l => l.buenas / l.cantidad >= GOAL / 100).length + "/" + s.lots.length],
+    ["Aprobación", pct.toFixed(1) + "%"], ["Lotes aprobados", GOAL === null ? "—" : s.lots.filter(l => l.buenas / l.cantidad >= GOAL / 100).length + "/" + s.lots.length],
     ["Mejor lote", best ? (best.buenas / best.cantidad * 100).toFixed(1) + "%" : "—"], ["Producidas", fmt(s.total)]
   ].map(([k, v]) => `<div class="metric"><span>${k}</span><b>${v}</b></div>`).join("");
-  $("#good-meter i").style.width = pct + "%"; $("#good-meter u").style.left = GOAL + "%";
+  $("#good-meter i").style.width = pct + "%"; $("#good-meter u").hidden = GOAL === null;
+  if (GOAL !== null) $("#good-meter u").style.left = GOAL + "%";
   $("#good-pct").textContent = pct.toFixed(1) + "% de aprobación";
 
   $("#bad-total").innerHTML = `${fmt(s.bad)}<small>merma / fallas</small>`;
@@ -815,6 +919,8 @@ tick(); setInterval(tick, 1000);
 renderRegistro();
 const start = (location.hash || "").replace("#", "");
 showTab(["registro", "graficas", "piezas"].includes(start) ? start : "registro");
+syncWithServer();
+setInterval(syncWithServer, 1500);
 </script>
 </body>
 </html>
